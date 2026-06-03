@@ -17,9 +17,40 @@ from google.oauth2 import service_account
 credentials = None
 creds_project_id = None
 
+# ======================================================================
+# 🚨 HARDCODED CREDENTIALS (PASTE YOUR SERVICE ACCOUNT JSON BELOW) 🚨
+# ======================================================================
+HARDCODED_CREDENTIALS_JSON = r"""
+{
+  "type": "service_account",
+  "project_id": "YOUR_PROJECT_ID",
+  "private_key_id": "YOUR_PRIVATE_KEY_ID",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_GOES_HERE\n-----END PRIVATE KEY-----\n",
+  "client_email": "YOUR_CLIENT_EMAIL",
+  "client_id": "YOUR_CLIENT_ID",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "YOUR_CLIENT_CERT_URL",
+  "universe_domain": "googleapis.com"
+}
+"""
+
+# 0. Attempt to load the Hardcoded Configuration First
+if HARDCODED_CREDENTIALS_JSON.strip() and "YOUR_PROJECT_ID" not in HARDCODED_CREDENTIALS_JSON:
+    print("Found HARDCODED_CREDENTIALS_JSON. Processing programmatic credentials...")
+    try:
+        creds_dict = json.loads(HARDCODED_CREDENTIALS_JSON.strip())
+        raw_creds = service_account.Credentials.from_service_account_info(creds_dict)
+        credentials = raw_creds.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
+        creds_project_id = creds_dict.get("project_id")
+        print(f"SUCCESS: Programmatic HARDCODED credentials loaded successfully for project '{creds_project_id}'!")
+    except Exception as e:
+        print(f"Failed to load HARDCODED_CREDENTIALS_JSON: {e}")
+
 # 1. Check for GOOGLE_APPLICATION_CREDENTIALS_JSON (ideal for Vercel/Production)
 gcp_credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
-if gcp_credentials_json:
+if not credentials and gcp_credentials_json:
     print("Found GOOGLE_APPLICATION_CREDENTIALS_JSON env var. Processing programmatic credentials...")
     try:
         cleaned_json = gcp_credentials_json.strip()
@@ -109,7 +140,7 @@ def generate_image_route():
         model_selection = data.get('model', 'gemini-3.1-flash-image')
         ratio = data.get('ratio', '1:1')
         quality_selection = data.get('quality', '2K').upper() # Map standard selections like 1K, 2K, 4K
-        uploaded_images = data.get('imagePrompts', []) # base64 strings
+        uploaded_images = data.get('imagePrompts') or [] # base64 strings
 
         if not prompt.strip():
             return jsonify({'success': False, 'error': 'Prompt cannot be empty.'}), 400
@@ -170,18 +201,29 @@ def generate_image_route():
             )
         )
 
-        # Retrieve bytes from parts
+        # Retrieve bytes from parts safely
         image_bytes = None
         if response.candidates and len(response.candidates) > 0:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data:
-                    image_bytes = part.inline_data.data
-                    break
+            candidate = response.candidates[0]
+            
+            # Print candidate finish reason and safety ratings for diagnostics
+            finish_reason = getattr(candidate, 'finish_reason', 'UNKNOWN')
+            print(f"Candidate finish reason: {finish_reason}", flush=True)
+            
+            if candidate.content and candidate.content.parts:
+                for part in candidate.content.parts:
+                    if part.inline_data and part.inline_data.data:
+                        image_bytes = part.inline_data.data
+                        break
+            else:
+                print(f"Warning: Candidate content or parts is empty/None! Finish reason: {finish_reason}", flush=True)
+                if getattr(candidate, 'safety_ratings', None):
+                    print(f"Safety ratings: {candidate.safety_ratings}", flush=True)
 
         if not image_bytes:
             return jsonify({
                 'success': False,
-                'error': 'Google AI Model returned no image binary data.'
+                'error': 'Google AI Model returned no image binary data. This can happen if safety filters are triggered or if the model failed to generate an image for the prompt.'
             }), 400
 
         # Encode bytes back to base64
@@ -192,7 +234,10 @@ def generate_image_route():
         })
 
     except Exception as e:
-        print(f"Generation request failed: {e}")
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        print(f"Generation request failed: {e}", flush=True)
         return jsonify({
             'success': False,
             'error': str(e)
