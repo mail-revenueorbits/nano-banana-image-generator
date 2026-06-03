@@ -12,20 +12,50 @@ app = Flask(__name__)
 CORS(app)
 
 import tempfile
+import json
 
 # Support loading Google Application Default Credentials from a JSON environment variable on serverless environments
 gcp_credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 if gcp_credentials_json:
-    print("Found GOOGLE_APPLICATION_CREDENTIALS_JSON env var. Writing to a temp file...")
+    print("Found GOOGLE_APPLICATION_CREDENTIALS_JSON env var. Processing and validating...")
     try:
+        # Strip any leading/trailing whitespace or outer quotes added by env managers
+        cleaned_json = gcp_credentials_json.strip()
+        if cleaned_json.startswith("'") and cleaned_json.endswith("'"):
+            cleaned_json = cleaned_json[1:-1].strip()
+        elif cleaned_json.startswith('"') and cleaned_json.endswith('"'):
+            try:
+                # If double-wrapped, unescape it by loading as standard string
+                unescaped = json.loads(cleaned_json)
+                if isinstance(unescaped, str):
+                    cleaned_json = unescaped.strip()
+            except Exception:
+                cleaned_json = cleaned_json[1:-1].strip()
+
+        # Parse JSON string to dictionary to validate structure
+        try:
+            creds_dict = json.loads(cleaned_json)
+        except json.JSONDecodeError as je:
+            print(f"Standard JSON load failed: {je}. Attempting auto-correction of quotes...")
+            try:
+                # Auto-correct single quotes to double quotes (common copy-paste typo)
+                fixed_json = cleaned_json.replace("'", '"')
+                creds_dict = json.loads(fixed_json)
+                print("Successfully auto-corrected single quotes to double quotes!")
+            except Exception:
+                # If auto-correction fails, re-raise the original JSON decode error
+                raise je
+
+        # Serialize dictionary cleanly back to a valid JSON file structure
         temp_dir = tempfile.gettempdir()
         temp_creds_path = os.path.join(temp_dir, "google_credentials.json")
         with open(temp_creds_path, "w") as f:
-            f.write(gcp_credentials_json)
+            json.dump(creds_dict, f, indent=2)
+
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_creds_path
         print(f"GOOGLE_APPLICATION_CREDENTIALS successfully configured to: {temp_creds_path}")
     except Exception as e:
-        print(f"Failed to write temporary credentials file: {e}")
+        print(f"Failed to process and write GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}")
 
 print("Initializing Google Gen AI Client with Vertex AI...")
 try:
