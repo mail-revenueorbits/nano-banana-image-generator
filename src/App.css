@@ -680,8 +680,8 @@
 /* Aspect Ratio Select Grid */
 .aspect-ratio-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
 }
 
 .ratio-box-btn {
@@ -718,6 +718,7 @@
 .ratio-shape-16-9 { width: 24px; height: 13.5px; }
 .ratio-shape-9-16 { width: 13.5px; height: 24px; }
 .ratio-shape-4-3 { width: 20px; height: 15px; }
+.ratio-shape-3-4 { width: 15px; height: 20px; }
 .ratio-shape-21-9 { width: 26px; height: 11px; }
 
 .ratio-name {
@@ -951,10 +952,16 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
   z-index: 999; /* Just below floating drawers (1000) */
   animation: fadeInBackdrop 0.25s ease-out forwards;
+}
+
+@media (min-width: 901px) {
+  .sidebar-backdrop {
+    display: none !important;
+  }
 }
 
 @keyframes fadeInBackdrop {

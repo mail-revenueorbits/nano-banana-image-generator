@@ -26,6 +26,7 @@ const RATIOS = [
   { id: '16:9', name: 'Landscape', aspect: '16-9', w: 1280, h: 720 },
   { id: '9:16', name: 'Portrait', aspect: '9-16', w: 720, h: 1280 },
   { id: '4:3', name: 'Classic', aspect: '4-3', w: 1024, h: 768 },
+  { id: '3:4', name: 'Classic Portrait', aspect: '3-4', w: 768, h: 1024 },
   { id: '21:9', name: 'Cinematic', aspect: '21-9', w: 1440, h: 600 }
 ];
 
@@ -836,7 +837,7 @@ function App() {
                 className="skeleton-shimmer-box"
                 style={{
                   width: '320px',
-                  aspectRatio: ratio === '1:1' ? '1/1' : ratio === '16:9' ? '16/9' : ratio === '9:16' ? '9/16' : ratio === '4:3' ? '4/3' : '21/9',
+                  aspectRatio: ratio === '1:1' ? '1/1' : ratio === '16:9' ? '16/9' : ratio === '9:16' ? '9/16' : ratio === '4:3' ? '4/3' : ratio === '3:4' ? '3/4' : '21/9',
                   maxHeight: '45vh'
                 }}
               >
