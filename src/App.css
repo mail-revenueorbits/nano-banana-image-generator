@@ -680,7 +680,7 @@
 /* Aspect Ratio Select Grid */
 .aspect-ratio-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
@@ -715,11 +715,19 @@
 }
 
 .ratio-shape-1-1 { width: 18px; height: 18px; }
-.ratio-shape-16-9 { width: 24px; height: 13.5px; }
-.ratio-shape-9-16 { width: 13.5px; height: 24px; }
-.ratio-shape-4-3 { width: 20px; height: 15px; }
+.ratio-shape-2-3 { width: 14px; height: 21px; }
+.ratio-shape-3-2 { width: 21px; height: 14px; }
 .ratio-shape-3-4 { width: 15px; height: 20px; }
+.ratio-shape-4-3 { width: 20px; height: 15px; }
+.ratio-shape-4-5 { width: 16px; height: 20px; }
+.ratio-shape-5-4 { width: 20px; height: 16px; }
+.ratio-shape-9-16 { width: 13.5px; height: 24px; }
+.ratio-shape-16-9 { width: 24px; height: 13.5px; }
 .ratio-shape-21-9 { width: 26px; height: 11px; }
+.ratio-shape-1-4 { width: 6px; height: 24px; }
+.ratio-shape-4-1 { width: 24px; height: 6px; }
+.ratio-shape-1-8 { width: 3px; height: 24px; }
+.ratio-shape-8-1 { width: 24px; height: 3px; }
 
 .ratio-name {
   font-size: 0.72rem;

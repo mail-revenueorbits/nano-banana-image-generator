@@ -23,11 +23,19 @@ const MODELS = [
 
 const RATIOS = [
   { id: '1:1', name: 'Square', aspect: '1-1', w: 1024, h: 1024 },
-  { id: '16:9', name: 'Landscape', aspect: '16-9', w: 1280, h: 720 },
-  { id: '9:16', name: 'Portrait', aspect: '9-16', w: 720, h: 1280 },
-  { id: '4:3', name: 'Classic', aspect: '4-3', w: 1024, h: 768 },
-  { id: '3:4', name: 'Classic Portrait', aspect: '3-4', w: 768, h: 1024 },
-  { id: '21:9', name: 'Cinematic', aspect: '21-9', w: 1440, h: 600 }
+  { id: '2:3', name: 'Classic Portrait', aspect: '2-3', w: 800, h: 1200 },
+  { id: '3:2', name: 'Classic Landscape', aspect: '3-2', w: 1200, h: 800 },
+  { id: '3:4', name: 'Classic Vertical', aspect: '3-4', w: 768, h: 1024 },
+  { id: '4:3', name: 'Classic Horizontal', aspect: '4-3', w: 1024, h: 768 },
+  { id: '4:5', name: 'Instagram Portrait', aspect: '4-5', w: 800, h: 1000 },
+  { id: '5:4', name: 'Instagram Landscape', aspect: '5-4', w: 1000, h: 800 },
+  { id: '9:16', name: 'Tall Portrait', aspect: '9-16', w: 720, h: 1280 },
+  { id: '16:9', name: 'Widescreen', aspect: '16-9', w: 1280, h: 720 },
+  { id: '21:9', name: 'Cinematic', aspect: '21-9', w: 1440, h: 600 },
+  { id: '1:4', name: 'Extreme Vertical', aspect: '1-4', w: 400, h: 1600 },
+  { id: '4:1', name: 'Extreme Horizontal', aspect: '4-1', w: 1600, h: 400 },
+  { id: '1:8', name: 'Ultrapanoramic Vertical', aspect: '1-8', w: 200, h: 1600 },
+  { id: '8:1', name: 'Ultrapanoramic Horizontal', aspect: '8-1', w: 1600, h: 200 }
 ];
 
 const PRESETS = [
@@ -837,7 +845,7 @@ function App() {
                 className="skeleton-shimmer-box"
                 style={{
                   width: '320px',
-                  aspectRatio: ratio === '1:1' ? '1/1' : ratio === '16:9' ? '16/9' : ratio === '9:16' ? '9/16' : ratio === '4:3' ? '4/3' : ratio === '3:4' ? '3/4' : '21/9',
+                  aspectRatio: ratio.replace(':', '/'),
                   maxHeight: '45vh'
                 }}
               >

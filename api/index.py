@@ -87,11 +87,13 @@ def generate_image_route():
         # Append main prompt text
         contents.append(prompt)
 
-        # Standardize aspect ratio format matching Google GenAI requirements (e.g., "1:1", "3:4", "4:3", "9:16", "16:9")
-        valid_ratios = ["1:1", "3:4", "4:3", "9:16", "16:9"]
+        # Supported aspect ratios for Nano Banana 2
+        valid_ratios = [
+            "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", 
+            "9:16", "16:9", "21:9", "1:4", "4:1", "1:8", "8:1"
+        ]
         if ratio not in valid_ratios:
-            # Fallback mappings for ratios like 21:9
-            ratio = "16:9"
+            ratio = "1:1"
 
         # Map UI qualities to Google ImageConfig size specifications ("1K", "2K", "4K")
         valid_sizes = ["1K", "2K", "4K"]
