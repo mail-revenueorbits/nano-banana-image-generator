@@ -11,14 +11,32 @@ app = Flask(__name__)
 # Enable CORS for our React frontend running on localhost:5173
 CORS(app)
 
+import tempfile
+
+# Support loading Google Application Default Credentials from a JSON environment variable on serverless environments
+gcp_credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if gcp_credentials_json:
+    print("Found GOOGLE_APPLICATION_CREDENTIALS_JSON env var. Writing to a temp file...")
+    try:
+        temp_dir = tempfile.gettempdir()
+        temp_creds_path = os.path.join(temp_dir, "google_credentials.json")
+        with open(temp_creds_path, "w") as f:
+            f.write(gcp_credentials_json)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_creds_path
+        print(f"GOOGLE_APPLICATION_CREDENTIALS successfully configured to: {temp_creds_path}")
+    except Exception as e:
+        print(f"Failed to write temporary credentials file: {e}")
+
 print("Initializing Google Gen AI Client with Vertex AI...")
 try:
+    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "project-11977881-986e-4ab8-b4f")
+    location_id = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
     client = genai.Client(
         vertexai=True,
-        project="project-11977881-986e-4ab8-b4f",
-        location="global"
+        project=project_id,
+        location=location_id
     )
-    print("Google Gen AI Client initialized successfully!")
+    print(f"Google Gen AI Client initialized successfully for project '{project_id}' at location '{location_id}'!")
 except Exception as e:
     print(f"Failed to initialize Google Gen AI client: {e}")
     client = None
