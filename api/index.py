@@ -128,11 +128,18 @@ except Exception as e:
 
 @app.route('/api/generate', methods=['POST'])
 def generate_image_route():
-    if not client:
-        return jsonify({
-            'success': False,
-            'error': 'Google GenAI Client is not initialized. Check your credentials.'
-        }), 500
+    if not client or not credentials:
+        is_vercel = os.environ.get("VERCEL") == "1" or "VERCEL_ENV" in os.environ
+        if is_vercel:
+            return jsonify({
+                'success': False,
+                'error': 'Vercel Deployment Error: The environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON is missing or empty in your Vercel Project. Please go to your Vercel Dashboard -> Settings -> Environment Variables, add GOOGLE_APPLICATION_CREDENTIALS_JSON with your raw Google Cloud Service Account JSON key as the value, and redeploy.'
+            }), 500
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Google GenAI Client is not initialized. Please ensure service-account.json is present locally or GOOGLE_APPLICATION_CREDENTIALS_JSON is configured.'
+            }), 500
 
     try:
         data = request.json
