@@ -11,61 +11,85 @@ app = Flask(__name__)
 # Enable CORS for our React frontend running on localhost:5173
 CORS(app)
 
-import tempfile
 import json
+from google.oauth2 import service_account
 
-# Support loading Google Application Default Credentials from a JSON environment variable on serverless environments
+credentials = None
+creds_project_id = None
+
+# 1. Check for GOOGLE_APPLICATION_CREDENTIALS_JSON (ideal for Vercel/Production)
 gcp_credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 if gcp_credentials_json:
-    print("Found GOOGLE_APPLICATION_CREDENTIALS_JSON env var. Processing and validating...")
+    print("Found GOOGLE_APPLICATION_CREDENTIALS_JSON env var. Processing programmatic credentials...")
     try:
-        # Strip any leading/trailing whitespace or outer quotes added by env managers
         cleaned_json = gcp_credentials_json.strip()
         if cleaned_json.startswith("'") and cleaned_json.endswith("'"):
             cleaned_json = cleaned_json[1:-1].strip()
         elif cleaned_json.startswith('"') and cleaned_json.endswith('"'):
             try:
-                # If double-wrapped, unescape it by loading as standard string
                 unescaped = json.loads(cleaned_json)
                 if isinstance(unescaped, str):
                     cleaned_json = unescaped.strip()
             except Exception:
                 cleaned_json = cleaned_json[1:-1].strip()
 
-        # Parse JSON string to dictionary to validate structure
         try:
             creds_dict = json.loads(cleaned_json)
         except json.JSONDecodeError as je:
             print(f"Standard JSON load failed: {je}. Attempting auto-correction of quotes...")
             try:
-                # Auto-correct single quotes to double quotes (common copy-paste typo)
                 fixed_json = cleaned_json.replace("'", '"')
                 creds_dict = json.loads(fixed_json)
                 print("Successfully auto-corrected single quotes to double quotes!")
             except Exception:
-                # If auto-correction fails, re-raise the original JSON decode error
                 raise je
 
-        # Serialize dictionary cleanly back to a valid JSON file structure
-        temp_dir = tempfile.gettempdir()
-        temp_creds_path = os.path.join(temp_dir, "google_credentials.json")
-        with open(temp_creds_path, "w") as f:
-            json.dump(creds_dict, f, indent=2)
-
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_creds_path
-        print(f"GOOGLE_APPLICATION_CREDENTIALS successfully configured to: {temp_creds_path}")
+        raw_creds = service_account.Credentials.from_service_account_info(creds_dict)
+        credentials = raw_creds.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
+        creds_project_id = creds_dict.get("project_id")
+        print(f"Programmatic credentials loaded successfully for project '{creds_project_id}'!")
     except Exception as e:
-        print(f"Failed to process and write GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}")
+        print(f"Failed to load programmatically from GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}")
+
+# 2. Check for a local service-account.json in root or api/ (ideal for local development)
+else:
+    # Look in the parent of the api folder (project root) or api folder itself
+    search_paths = [
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "service-account.json"),
+        os.path.join(os.path.dirname(__file__), "service-account.json"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "credentials.json")
+    ]
+    for path in search_paths:
+        if os.path.exists(path):
+            print(f"Found local credentials file at {path}. Loading programmatically...")
+            try:
+                with open(path, "r") as f:
+                    creds_dict = json.load(f)
+                raw_creds = service_account.Credentials.from_service_account_info(creds_dict)
+                credentials = raw_creds.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
+                creds_project_id = creds_dict.get("project_id")
+                print(f"Local credentials loaded successfully for project '{creds_project_id}'!")
+                break
+            except Exception as e:
+                print(f"Failed to load local service account file {path}: {e}")
 
 print("Initializing Google Gen AI Client with Vertex AI...")
 try:
-    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "project-11977881-986e-4ab8-b4f")
+    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT") or creds_project_id or "project-11977881-986e-4ab8-b4f"
     location_id = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
-    client = genai.Client(
-        vertexai=True,
-        project=project_id,
-        location=location_id
-    )
+    
+    client_args = {
+        "vertexai": True,
+        "project": project_id,
+        "location": location_id
+    }
+    if credentials:
+        client_args["credentials"] = credentials
+        print(f"Using programmatically loaded service account credentials for project '{project_id}'.")
+    else:
+        print("No programmatically loaded credentials found. Falling back to Application Default Credentials (ADC).")
+
+    client = genai.Client(**client_args)
     print(f"Google Gen AI Client initialized successfully for project '{project_id}' at location '{location_id}'!")
 except Exception as e:
     print(f"Failed to initialize Google Gen AI client: {e}")

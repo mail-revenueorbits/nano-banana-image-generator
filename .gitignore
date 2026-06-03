@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Google Cloud credentials and local environment files
+service-account.json
+credentials.json
+.env
+.env.*
+!.env.example
