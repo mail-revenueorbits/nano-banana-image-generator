@@ -134,6 +134,18 @@ function deleteHistoryItemFromDB(id) {
   });
 }
 
+function loadFullHistoryItem(id) {
+  return openDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(id);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  });
+}
+
 // Helper to generate a downscaled compressed thumbnail for high-res images
 function generateThumbnail(base64DataUrl, maxWidth = 160) {
   return new Promise((resolve) => {
@@ -209,6 +221,21 @@ function App() {
   // -------------------------------------------------------------
   // EFFECTS & INITIALIZATION
   // -------------------------------------------------------------
+  // Helper to load selected full-res image on demand
+  const handleSelectImage = async (item) => {
+    try {
+      const fullItem = await loadFullHistoryItem(item.id);
+      if (fullItem) {
+        setCurrentImage(fullItem);
+      } else {
+        setCurrentImage(item);
+      }
+    } catch (err) {
+      console.error('Failed to load full image:', err);
+      setCurrentImage(item);
+    }
+  };
+
   useEffect(() => {
     // Load historical generations and credits
     const loadHistory = async () => {
@@ -238,8 +265,16 @@ function App() {
           }
         }
 
-        setHistory(dbHistory);
+        // Construct lightened history list for state (removing huge url field)
+        const lightHistory = dbHistory.map(item => {
+          const light = { ...item };
+          delete light.url;
+          return light;
+        });
+
+        setHistory(lightHistory);
         if (dbHistory.length > 0) {
+          // Set full first item in memory for active viewport
           setCurrentImage(dbHistory[0]);
         }
 
@@ -261,16 +296,24 @@ function App() {
                 await saveHistoryItem(updatedItem);
                 updatedHistory[i] = updatedItem;
                 stateNeedsUpdate = true;
-
-                // Sync current state incrementally so UI resolves immediately
-                setHistory([...updatedHistory]);
-                setCurrentImage(currentActive => {
-                  if (currentActive && currentActive.id === item.id) {
-                    return updatedItem;
-                  }
-                  return currentActive;
-                });
               }
+            }
+
+            if (stateNeedsUpdate) {
+              const lightHistory = updatedHistory.map(item => {
+                const light = { ...item };
+                delete light.url;
+                return light;
+              });
+              setHistory(lightHistory);
+              
+              setCurrentImage(currentActive => {
+                if (currentActive) {
+                  const match = updatedHistory.find(u => u.id === currentActive.id);
+                  if (match) return match;
+                }
+                return currentActive;
+              });
             }
           } catch (backgroundErr) {
             console.error('[Performance] Background thumbnail self-healing worker error:', backgroundErr);
@@ -291,15 +334,20 @@ function App() {
   }, []);
 
   const saveHistoryToStorage = async (updatedHistory, newlyAddedItem = null) => {
-    setHistory(updatedHistory);
+    // Strip url from history state items to keep memory footprints tiny
+    const lightHistory = updatedHistory.map(item => {
+      if (item.url) {
+        const light = { ...item };
+        delete light.url;
+        return light;
+      }
+      return item;
+    });
+    setHistory(lightHistory);
+
     try {
       if (newlyAddedItem) {
         await saveHistoryItem(newlyAddedItem);
-      } else {
-        // Full sync
-        for (const item of updatedHistory) {
-          await saveHistoryItem(item);
-        }
       }
     } catch (e) {
       console.error('Failed to save to IndexedDB:', e);
@@ -596,23 +644,25 @@ function App() {
   // -------------------------------------------------------------
   const toggleFavorite = async (id, e) => {
     e.stopPropagation();
-    const targetItem = history.find(item => item.id === id);
-    if (!targetItem) return;
-
-    const updatedItem = { ...targetItem, isFavorite: !targetItem.isFavorite };
-    const updatedHistory = history.map(item => 
-      item.id === id ? updatedItem : item
-    );
-
-    setHistory(updatedHistory);
     try {
-      await saveHistoryItem(updatedItem);
+      // Fetch full-res item from IndexedDB
+      const fullItem = await loadFullHistoryItem(id);
+      if (!fullItem) return;
+
+      const updatedFullItem = { ...fullItem, isFavorite: !fullItem.isFavorite };
+      await saveHistoryItem(updatedFullItem);
+
+      // Update lightweight history state
+      const updatedHistory = history.map(item => 
+        item.id === id ? { ...item, isFavorite: updatedFullItem.isFavorite } : item
+      );
+      setHistory(updatedHistory);
+
+      if (currentImage && currentImage.id === id) {
+        setCurrentImage(updatedFullItem);
+      }
     } catch (err) {
       console.error('Failed to update favorite in IndexedDB:', err);
-    }
-
-    if (currentImage && currentImage.id === id) {
-      setCurrentImage(updatedItem);
     }
   };
 
@@ -627,7 +677,11 @@ function App() {
         console.error('Failed to delete from IndexedDB:', err);
       }
       if (currentImage && currentImage.id === id) {
-        setCurrentImage(updated[0] || null);
+        if (updated.length > 0) {
+          handleSelectImage(updated[0]);
+        } else {
+          setCurrentImage(null);
+        }
       }
     }
   };
@@ -761,7 +815,7 @@ function App() {
               <div 
                 key={item.id} 
                 className={`history-item ${currentImage && currentImage.id === item.id ? 'active' : ''}`}
-                onClick={() => setCurrentImage(item)}
+                onClick={() => handleSelectImage(item)}
               >
                 <img src={item.thumbnail || item.url || item.rawApiUrl} alt="Thumbnail" className="history-thumb" />
                 <div className="history-info">
