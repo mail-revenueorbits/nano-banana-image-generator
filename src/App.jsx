@@ -146,6 +146,18 @@ function loadFullHistoryItem(id) {
   });
 }
 
+function clearHistoryDB() {
+  return openDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.clear();
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  });
+}
+
 // Helper to generate a downscaled compressed thumbnail for high-res images
 function generateThumbnail(base64DataUrl, maxWidth = 160) {
   return new Promise((resolve) => {
@@ -236,10 +248,38 @@ function App() {
     }
   };
 
+  const handleClearCache = async () => {
+    if (confirm('Are you sure you want to clear your local history cache? This will delete all generated images from your history panel. (Downloaded images remain safe on your device.)')) {
+      try {
+        await clearHistoryDB();
+        setHistory([]);
+        setCurrentImage(null);
+        alert('Cache cleared successfully! Speed has been fully restored! 🍌');
+      } catch (err) {
+        console.error('Failed to clear cache:', err);
+        alert('Failed to clear cache. Please try reloading the page.');
+      }
+    }
+  };
+
   useEffect(() => {
     // Load historical generations and credits
     const loadHistory = async () => {
       try {
+        // One-time automatic clean reset to purge legacy high-res memory bloat
+        const autoClearKey = 'nano_banana_cache_reset_v2';
+        if (!localStorage.getItem(autoClearKey)) {
+          console.log('[Performance] Triggering clean reset of heavy legacy cache...');
+          try {
+            await clearHistoryDB();
+            localStorage.setItem(autoClearKey, 'true');
+            localStorage.removeItem('nano_banana_history');
+            console.log('[Performance] Legacy cache successfully wiped.');
+          } catch (wipeErr) {
+            console.error('Failed one-time auto-wipe:', wipeErr);
+          }
+        }
+
         let dbHistory = await loadHistoryItems();
         
         // One-time Migration from localStorage to IndexedDB
@@ -777,6 +817,41 @@ function App() {
         <div className="credits-capsule">
           <span>Nano-Credits</span>
           <span className="credits-count">✨ {nanoCredits}</span>
+        </div>
+
+        {/* Clear Cache Button */}
+        <div style={{ padding: '0 20px 15px 20px' }}>
+          <button 
+            className="btn-premium-secondary"
+            onClick={handleClearCache}
+            style={{ 
+              width: '100%', 
+              padding: '8px 12px', 
+              fontSize: '0.8rem', 
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              color: '#ef4444',
+              fontWeight: 600,
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+              e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+            }}
+          >
+            <span>🗑️</span>
+            <span>Clear History Cache</span>
+          </button>
         </div>
 
         {/* Filters */}
